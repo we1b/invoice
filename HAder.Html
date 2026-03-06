@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>أداة مشكاة لعروض الأسعار</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f3f4f6;
+        }
+        
+        /* تنسيقات الطباعة وتقسيم الصفحات للـ PDF */
+        .pdf-page {
+            width: 210mm;
+            min-height: 297mm;
+            background-color: white;
+            margin: 0 auto;
+            position: relative;
+            padding: 15mm;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            border: 1px solid #d1d5db;
+            padding: 8px;
+            text-align: center;
+        }
+        
+        th {
+            background-color: #f3f4f6;
+            font-weight: 700;
+        }
+
+        /* منع قطع الصفوف بين الصفحات */
+        tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        
+        thead {
+            display: table-header-group;
+        }
+
+        /* العلامة المائية */
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.05;
+            width: 60%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .content-z {
+            position: relative;
+            z-index: 10;
+        }
+
+        /* إخفاء شريط التمرير الافتراضي لشكل أنظف */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555; 
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col md:flex-row">
+
+    <!-- لوحة التحكم (إدخال البيانات) -->
+    <div class="w-full md:w-1/3 lg:w-1/4 bg-white h-full border-l border-gray-200 shadow-xl flex flex-col z-20">
+        <div class="p-4 bg-gray-800 text-white flex justify-between items-center">
+            <h1 class="text-xl font-bold">لوحة تحكم الفاتورة ✍🏻</h1>
+        </div>
+        
+        <div class="p-4 overflow-y-auto flex-1 space-y-6">
+            
+            <!-- بيانات العميل -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                <h2 class="font-bold text-gray-700 mb-3 border-b pb-2">بيانات العرض</h2>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">اسم العميل / الجهة</label>
+                        <input type="text" id="clientNameInput" placeholder="شركة كذا..." class="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none transition" oninput="updatePreview()">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">التاريخ</label>
+                        <input type="date" id="dateInput" class="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none transition" oninput="updatePreview()">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">عنوان العرض (اختياري)</label>
+                        <input type="text" id="projectTitleInput" placeholder="تصميم هوية بصرية..." class="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none transition" oninput="updatePreview()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- الأصناف -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                <div class="flex justify-between items-center mb-3 border-b pb-2">
+                    <h2 class="font-bold text-gray-700">الأصناف والخدمات</h2>
+                    <button onclick="addNewItem()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition shadow">
+                        + إضافة صنف
+                    </button>
+                </div>
+                
+                <div id="itemsContainer" class="space-y-4">
+                    <!-- سيتم إضافة حقول الأصناف هنا -->
+                </div>
+            </div>
+
+            <!-- إعدادات إضافية -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                <h2 class="font-bold text-gray-700 mb-3 border-b pb-2">إعدادات الصور</h2>
+                <p class="text-xs text-gray-500 mb-2">تأكد من وجود ملف 2.png (الشعار) وملف qr.png في نفس المجلد. أو ارفعهم من هنا للمعاينة.</p>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">الشعار (اختياري لرفعه يدويا)</label>
+                        <input type="file" id="logoUpload" accept="image/png, image/jpeg" class="w-full text-sm" onchange="handleImageUpload(event, 'logo')">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">رمز الـ QR (اختياري لرفعه يدويا)</label>
+                        <input type="file" id="qrUpload" accept="image/png, image/jpeg" class="w-full text-sm" onchange="handleImageUpload(event, 'qr')">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- زر التحميل -->
+        <div class="p-4 bg-gray-50 border-t border-gray-200">
+            <button onclick="generatePDF()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg flex justify-center items-center gap-2 transition text-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                تحميل الفاتورة PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- المعاينة الحية (شكل الورقة) -->
+    <div class="w-full md:w-2/3 lg:w-3/4 h-full bg-gray-300 overflow-y-auto p-4 md:p-8 flex justify-center items-start">
+        
+        <!-- حاوية الـ PDF -->
+        <div id="invoice-preview" class="pdf-page text-gray-800">
+            
+            <!-- الشعار في الخلفية -->
+            <img id="bg-logo" src="2.png" alt="" class="watermark" onerror="this.style.display='none'">
+
+            <div class="content-z flex flex-col h-full">
+                
+                <!-- رأس الفاتورة -->
+                <div class="flex justify-between items-start border-b-2 border-gray-800 pb-4 mb-6">
+                    <div class="w-1/2">
+                        <h1 class="text-3xl font-bold text-gray-900 mb-2">عرض سعر</h1>
+                        <p class="text-gray-600 font-semibold">رقم التسجيل الضريبي: <span class="tracking-wider">703-665-766</span></p>
+                        <div class="mt-4">
+                            <p class="text-lg">السادة المحترمين / <span id="previewClient" class="font-bold text-blue-800">..............................</span></p>
+                            <p class="text-md mt-1">التاريخ: <span id="previewDate" class="font-bold">...................</span></p>
+                            <p id="previewTitleContainer" class="text-md mt-1 hidden">بخصوص: <span id="previewTitle" class="font-bold text-gray-800"></span></p>
+                        </div>
+                    </div>
+                    <div class="w-1/3 flex justify-end">
+                        <img id="header-logo" src="2.png" alt="الشعار" class="max-h-32 object-contain" onerror="this.style.display='none'">
+                    </div>
+                </div>
+
+                <!-- جدول الأصناف -->
+                <div class="flex-grow">
+                    <table class="w-full text-sm lg:text-base">
+                        <thead>
+                            <tr>
+                                <th class="w-12">م</th>
+                                <th class="text-right">البيان / الخدمة</th>
+                                <th class="w-20">الكمية</th>
+                                <th class="w-24">السعر</th>
+                                <th class="w-32">الإجمالي</th>
+                            </tr>
+                        </thead>
+                        <tbody id="previewTableBody">
+                            <!-- سيتم حقن الصفوف هنا -->
+                        </tbody>
+                        <tfoot>
+                            <tr class="font-bold bg-gray-100">
+                                <td colspan="4" class="text-left p-3">الإجمالي الكلي</td>
+                                <td class="p-3 text-blue-700 text-lg"><span id="previewTotal">0</span> جنيه</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- الشروط والأحكام والتذييل -->
+                <div class="mt-8 pt-4 border-t border-gray-300 page-break-avoid">
+                    <div class="flex flex-col md:flex-row justify-between gap-4">
+                        <div class="w-full md:w-2/3">
+                            <h3 class="font-bold text-gray-800 mb-2 text-lg border-b inline-block border-gray-400">الشروط والأحكام:</h3>
+                            <ul class="text-sm space-y-2 text-gray-700 mt-2 list-none">
+                                <li><span class="text-red-500 font-bold ml-1">▪</span> السعر غير شامل ضريبة القيمة المضافة.</li>
+                                <li><span class="text-red-500 font-bold ml-1">▪</span> يتم التنفيذ من 15 إلى 25 يوم من تاريخ التعاقد.</li>
+                                <li><span class="text-red-500 font-bold ml-1">▪</span> طريقة التعاقد : 50% عند التعاقد و 50% عند الإستلام.</li>
+                            </ul>
+
+                            <h3 class="font-bold text-gray-800 mb-2 mt-4 text-lg border-b inline-block border-gray-400">طرق الدفع:</h3>
+                            <div class="text-sm space-y-1 text-gray-700 mt-2 font-mono" dir="ltr" style="text-align: right;">
+                                <p><strong class="font-sans text-blue-800 mr-2">Instapay:</strong> 01000036282</p>
+                                <p><strong class="font-sans text-blue-800 mr-2">BANK MISR:</strong> 1050001000004665</p>
+                                <p><strong class="font-sans text-blue-800 mr-2">NBK BANK:</strong> 010148043810060</p>
+                            </div>
+                        </div>
+                        
+                        <div class="w-full md:w-1/3 flex flex-col items-center justify-end">
+                            <img id="footer-qr" src="qr.png" alt="QR Code" class="w-24 h-24 mb-3 border border-gray-200 p-1 rounded shadow-sm" onerror="this.style.display='none'">
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-8 bg-blue-50 py-3 rounded text-blue-900 font-bold border border-blue-100">
+                        نأمل أن ينال عرض السعر قبولكم ورضاكم، ونتطلع للعمل معكم قريباً. 🤝
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // تعيين تاريخ اليوم كافتراضي
+        document.getElementById('dateInput').valueAsDate = new Date();
+
+        // مصفوفة الأصناف
+        let items = [
+            { id: 1, name: '', qty: 1, price: 0 }
+        ];
+
+        // دالة لتهيئة أول عنصر
+        function init() {
+            renderInputs();
+            updatePreview();
+        }
+
+        // دالة رسم حقول الإدخال
+        function renderInputs() {
+            const container = document.getElementById('itemsContainer');
+            container.innerHTML = '';
+
+            items.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'bg-white p-3 rounded border border-gray-200 shadow-sm relative';
+                
+                itemDiv.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-bold bg-gray-200 px-2 py-1 rounded text-gray-700">صنف رقم ${index + 1}</span>
+                        ${items.length > 1 ? `<button onclick="removeItem(${item.id})" class="text-red-500 hover:text-red-700 text-xs font-bold">حذف 🗑️</button>` : ''}
+                    </div>
+                    <div class="space-y-2">
+                        <input type="text" placeholder="اسم الصنف أو تفاصيل الخدمة" value="${item.name}" oninput="updateItem(${item.id}, 'name', this.value)" class="w-full text-sm border border-gray-300 rounded p-1.5 focus:ring-1 focus:ring-blue-500 outline-none">
+                        <div class="flex gap-2">
+                            <div class="w-1/3">
+                                <label class="text-xs text-gray-500 block mb-1">الكمية</label>
+                                <input type="number" min="1" value="${item.qty}" oninput="updateItem(${item.id}, 'qty', this.value)" class="w-full text-sm border border-gray-300 rounded p-1.5 text-center focus:ring-1 focus:ring-blue-500 outline-none">
+                            </div>
+                            <div class="w-2/3">
+                                <label class="text-xs text-gray-500 block mb-1">السعر (للوحدة)</label>
+                                <input type="number" min="0" value="${item.price}" oninput="updateItem(${item.id}, 'price', this.value)" class="w-full text-sm border border-gray-300 rounded p-1.5 text-center focus:ring-1 focus:ring-blue-500 outline-none">
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(itemDiv);
+            });
+        }
+
+        // إضافة صنف جديد
+        function addNewItem() {
+            const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
+            items.push({ id: newId, name: '', qty: 1, price: 0 });
+            renderInputs();
+            updatePreview();
+            
+            // التمرير لأسفل لؤية الصنف الجديد
+            const container = document.getElementById('itemsContainer');
+            setTimeout(() => {
+                container.lastElementChild.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+
+        // حذف صنف
+        function removeItem(id) {
+            items = items.filter(item => item.id !== id);
+            renderInputs();
+            updatePreview();
+        }
+
+        // تحديث بيانات صنف
+        function updateItem(id, field, value) {
+            const item = items.find(i => i.id === id);
+            if (item) {
+                item[field] = field === 'name' ? value : Number(value);
+                updatePreview();
+            }
+        }
+
+        // تحديث المعاينة الحية
+        function updatePreview() {
+            // بيانات العميل
+            const clientName = document.getElementById('clientNameInput').value;
+            document.getElementById('previewClient').innerText = clientName || '..............................';
+
+            // التاريخ
+            const dateVal = document.getElementById('dateInput').value;
+            document.getElementById('previewDate').innerText = dateVal || '...................';
+
+            // العنوان
+            const titleVal = document.getElementById('projectTitleInput').value;
+            const titleContainer = document.getElementById('previewTitleContainer');
+            if (titleVal) {
+                document.getElementById('previewTitle').innerText = titleVal;
+                titleContainer.classList.remove('hidden');
+            } else {
+                titleContainer.classList.add('hidden');
+            }
+
+            // الجدول
+            const tbody = document.getElementById('previewTableBody');
+            tbody.innerHTML = '';
+            let totalAmount = 0;
+
+            items.forEach((item, index) => {
+                const itemTotal = (item.qty || 0) * (item.price || 0);
+                totalAmount += itemTotal;
+
+                const tr = document.createElement('tr');
+                // تنسيق لتجنب قطع الصف في الـ PDF
+                tr.style.pageBreakInside = 'avoid';
+                
+                tr.innerHTML = `
+                    <td class="font-bold">${index + 1}</td>
+                    <td class="text-right whitespace-pre-wrap">${item.name || '<span class="text-gray-300">بدون اسم</span>'}</td>
+                    <td>${item.qty || 0}</td>
+                    <td>${item.price ? item.price.toLocaleString() : 0}</td>
+                    <td class="font-bold">${itemTotal.toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // الإجمالي
+            document.getElementById('previewTotal').innerText = totalAmount.toLocaleString();
+        }
+
+        // التعامل مع رفع الصور المؤقت للمعاينة
+        function handleImageUpload(event, type) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    if (type === 'logo') {
+                        const logoHeader = document.getElementById('header-logo');
+                        const logoBg = document.getElementById('bg-logo');
+                        logoHeader.src = e.target.result;
+                        logoHeader.style.display = 'block';
+                        logoBg.src = e.target.result;
+                        logoBg.style.display = 'block';
+                    } else if (type === 'qr') {
+                        const qrImg = document.getElementById('footer-qr');
+                        qrImg.src = e.target.result;
+                        qrImg.style.display = 'block';
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // توليد وتحميل الـ PDF
+        function generatePDF() {
+            const element = document.getElementById('invoice-preview');
+            const clientName = document.getElementById('clientNameInput').value || 'عميل';
+            
+            // خيارات الـ PDF للحصول على جودة عالية وحجم صغير وتقسيم صحيح
+            const opt = {
+                margin:       0, // الحواف معمولة بالـ CSS داخل العنصر نفسه
+                filename:     `عرض_سعر_${clientName}.pdf`,
+                image:        { type: 'jpeg', quality: 0.95 },
+                html2canvas:  { 
+                    scale: 2, // جودة ممتازة وحجم معقول
+                    useCORS: true,
+                    logging: false
+                },
+                jsPDF:        { 
+                    unit: 'mm', 
+                    format: 'a4', 
+                    orientation: 'portrait' 
+                },
+                pagebreak:    { mode: 'css', avoid: ['tr', '.page-break-avoid'] }
+            };
+
+            // إظهار رسالة تحميل أو تغيير شكل الزر
+            const btn = document.querySelector('button[onclick="generatePDF()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'جاري التجهيز والتحميل... ⏳';
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                // إرجاع الزر لشكله الطبيعي بعد التحميل
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            }).catch(err => {
+                console.error('Error generating PDF:', err);
+                alert('حصل مشكلة أثناء التحميل، جرب تاني.');
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            });
+        }
+
+        // تشغيل التهيئة عند فتح الصفحة
+        window.onload = init;
+    </script>
+</body>
+</html>
