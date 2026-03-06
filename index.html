@@ -155,8 +155,12 @@
                                 <p id="previewTitleContainer" class="text-md mt-1 hidden">بخصوص: <span id="previewTitle" class="font-bold text-gray-800"></span></p>
                             </div>
                         </div>
-                        <div class="w-1/3 flex justify-end">
-                            <img id="header-logo" src="2.png" alt="الشعار" class="max-h-32 object-contain" onerror="this.style.display='none'">
+                        
+                        <!-- منطقة الشعار القابلة للضغط -->
+                        <div class="w-1/3 flex justify-end cursor-pointer group relative min-h-[80px]" onclick="document.getElementById('logo-upload-hidden').click()" title="اضغط لتغيير الشعار">
+                            <span class="text-xs text-gray-400 absolute inset-0 flex items-center justify-end text-left pr-2 z-0">اضغط لإضافة الشعار</span>
+                            <img id="header-logo" src="2.png" alt="" class="max-h-32 object-contain relative z-10 group-hover:opacity-80 transition bg-white" onerror="this.style.opacity='0'">
+                            <input type="file" id="logo-upload-hidden" class="hidden" accept="image/*" onchange="updateLogo(this)">
                         </div>
                     </div>
 
@@ -200,8 +204,13 @@
                                 </div>
                             </div>
                             
+                            <!-- منطقة الـ QR القابلة للضغط -->
                             <div class="w-full md:w-1/3 flex flex-col items-end justify-end">
-                                <img id="footer-qr" src="qr.png" alt="QR Code" class="w-32 h-32 mb-3 border-2 border-gray-200 p-1.5 rounded-lg shadow-md">
+                                <div class="w-32 h-32 mb-3 border-2 border-gray-200 p-1.5 rounded-lg shadow-md cursor-pointer group relative flex items-center justify-center bg-white overflow-hidden" onclick="document.getElementById('qr-upload-hidden').click()" title="اضغط لتغيير أو إضافة الـ QR">
+                                    <span class="text-xs text-gray-400 absolute text-center px-2 z-0">اضغط لإضافة QR</span>
+                                    <img id="footer-qr" src="qr.png" alt="" class="w-full h-full object-contain relative z-10 group-hover:opacity-80 transition bg-white" onerror="this.style.opacity='0'">
+                                </div>
+                                <input type="file" id="qr-upload-hidden" class="hidden" accept="image/*" onchange="updateQR(this)">
                             </div>
                         </div>
 
@@ -322,6 +331,35 @@
             });
 
             document.getElementById('previewTotal').innerText = totalAmount.toLocaleString();
+        }
+
+        // دوال تحديث الصور بالضغط المباشر
+        function updateLogo(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('header-logo');
+                    img.src = e.target.result;
+                    img.style.opacity = '1';
+                    
+                    const bgImg = document.getElementById('bg-logo');
+                    bgImg.src = e.target.result;
+                    bgImg.style.display = 'block';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function updateQR(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('footer-qr');
+                    img.src = e.target.result;
+                    img.style.opacity = '1';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
         }
 
         function generatePDF() {
